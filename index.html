@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinity Geometry - Advanced Logic</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --accent-color: #00ffd5;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .dev-tag {
+            position: absolute;
+            top: 20px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 1px;
+        }
+
+        .canvas-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 255, 213, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            line-height: 0;
+            width: 800px;
+            height: 800px;
+            max-width: 90vw;
+            max-height: 70vh;
+            background: #000;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .formula-display {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            color: var(--accent-color);
+            font-family: serif;
+            font-style: italic;
+            height: 30px;
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        .controls {
+            margin-top: 20px;
+            z-index: 10;
+        }
+
+        button {
+            padding: 12px 35px;
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            background: transparent;
+            color: var(--accent-color);
+            border: 2px solid var(--accent-color);
+            transition: all 0.3s ease;
+            border-radius: 50px;
+        }
+
+        button:hover {
+            background: var(--accent-color);
+            color: black;
+            box-shadow: 0 0 30px var(--accent-color);
+        }
+
+        .info-box {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dev-tag">Developed by mmh_</div>
+
+    <div class="canvas-container">
+        <canvas id="mathCanvas" width="1600" height="1600"></canvas>
+    </div>
+    
+    <div id="mathFormula" class="formula-display"></div>
+
+    <div class="controls">
+        <button onclick="start()">ابدأ الرحلة ➔</button>
+    </div>
+
+    <div class="info-box" id="stepCounter">اضغط للبدء</div>
+
+    <audio id="bgMusic" src="montagem.mp3" loop></audio>
+
+    <script>
+        const canvas = document.getElementById('mathCanvas');
+        const ctx = canvas.getContext('2d');
+        const mathFormula = document.getElementById('mathFormula');
+        const stepCounter = document.getElementById('stepCounter');
+        const audio = document.getElementById('bgMusic');
+
+        let step = 0;
+        let isAnimating = false;
+        let isZooming = false;
+        
+        let camX = 800;
+        let camY = 800;
+        let scale = 1;
+        let targetScale = 1;
+        let targetCamX = 800;
+        let targetCamY = 800;
+
+        const colors = [
+            {fill: '#004d4d', stroke: '#00ffd5'}, 
+            {fill: '#2d004d', stroke: '#bc13fe'}, 
+            {fill: '#00334d', stroke: '#00d4ff'}, 
+            {fill: '#4d004d', stroke: '#ff00ff'}
+        ];
+
+        let shapes = [];
+
+        function getRandomFormula() {
+            const formulas = [
+                "f(θ) = sin(θ) + Σ(1/2ⁿ)",
+                "lim (n→∞) ∏ [1 + 1/n^2] = π/2",
+                "δ = ∫ √(1 + (dy/dx)²) dx",
+                "e^(iπ) + 1 = 0 (Euler's Identity)",
+                "Δx Δp ≥ ℏ / 2",
+                "∇ × B = μ₀J + μ₀ε₀(∂E/∂t)",
+                "ζ(s) = Σ n⁻ˢ (Re(s) > 1)",
+                "∮ E · dA = Q / ε₀"
+            ];
+            return formulas[Math.floor(Math.random() * formulas.length)];
+        }
+
+        function start() {
+            if (isAnimating) return;
+            isAnimating = true;
+            audio.play().catch(() => {});
+            
+            shapes = [];
+            step = 0;
+            scale = 1;
+            targetScale = 1;
+            camX = 800;
+            camY = 800;
+            targetCamX = 800;
+            targetCamY = 800;
+            isZooming = false;
+            
+            addNewShape();
+            gameLoop();
+        }
+
+        function addNewShape() {
+            isZooming = false; // نوقف الزووم مؤقتاً عشان المربع يبان
+            let x = 0, y = 0, w = 1600, h = 1600;
+            
+            for (let i = 0; i < step; i++) {
+                if (i % 2 === 0) {
+                    x += w / 2;
+                    w /= 2;
+                } else {
+                    y += h / 2;
+                    h /= 2;
+                }
+            }
+
+            let drawW = (step % 2 === 0) ? w / 2 : w;
+            let drawH = (step % 2 === 0) ? h : h / 2;
+            
+            shapes.push({
+                x: x, y: y, w: drawW, h: drawH,
+                color: colors[step % colors.length],
+                label: `1/${Math.pow(2, step + 1)}`,
+                opacity: 0
+            });
+
+            // تحديد هدف الزووم القادم
+            let nextW = (step % 2 === 0) ? w / 2 : w;
+            let nextH = (step % 2 === 0) ? h : h / 2;
+            let nextX = (step % 2 === 0) ? x + nextW : x;
+            let nextY = (step % 2 === 0) ? y : y + nextH;
+
+            targetCamX = nextX + nextW / 2;
+            targetCamY = nextY + nextH / 2;
+            targetScale = Math.pow(2, Math.floor((step + 1) / 2));
+            
+            mathFormula.innerText = getRandomFormula();
+            stepCounter.innerText = `المستوى: ${step + 1} | زووم: x${targetScale.toFixed(0)}`;
+
+            // انتظر ثانية بعد ظهور المربع قبل ما تبدأ الزووم
+            setTimeout(() => {
+                isZooming = true;
+            }, 1200);
+        }
+
+        function gameLoop() {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // تحريك الكاميرا فقط لو وضع الزووم مفعل
+            if (isZooming) {
+                scale += (targetScale - scale) * 0.05; // سرعة أهدى للزووم
+                camX += (targetCamX - camX) * 0.05;
+                camY += (targetCamY - camY) * 0.05;
+            }
+
+            ctx.translate(800, 800);
+            ctx.scale(scale, scale);
+            ctx.translate(-camX, -camY);
+
+            shapes.forEach((s, index) => {
+                if (s.opacity < 1) s.opacity += 0.04;
+                
+                ctx.save();
+                ctx.globalAlpha = s.opacity;
+                ctx.fillStyle = s.color.fill;
+                ctx.fillRect(s.x, s.y, s.w, s.h);
+                
+                ctx.strokeStyle = "rgba(255,255,255,0.8)";
+                ctx.lineWidth = 2 / scale;
+                ctx.strokeRect(s.x, s.y, s.w, s.h);
+
+                // رسم النص
+                ctx.fillStyle = "white";
+                let fs = 60 / Math.pow(2, Math.floor(index / 2));
+                ctx.font = `bold ${fs}px serif`;
+                ctx.textAlign = "center";
+                
+                if (fs * scale > 20) {
+                    ctx.fillText(s.label, s.x + s.w/2, s.y + s.h/2 + fs/3);
+                }
+                ctx.restore();
+            });
+
+            // الانتقال للخطوة التالية فقط بعد انتهاء الزووم
+            if (isZooming && Math.abs(scale - targetScale) < 0.05) {
+                step++;
+                if (step < 60) {
+                    addNewShape();
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
+
